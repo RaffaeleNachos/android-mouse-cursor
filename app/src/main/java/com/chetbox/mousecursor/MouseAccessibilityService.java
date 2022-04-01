@@ -4,7 +4,9 @@ import android.accessibilityservice.AccessibilityService;
 import android.content.Intent;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.Handler;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -72,7 +74,25 @@ public class MouseAccessibilityService extends AccessibilityService {
     }
 
     @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+
+        Log.d(TAG, "Service Connected!");
+        askPermission();
+        windowManager.addView(cursorView, cursorLayout);
+    }
+
+    public void askPermission() {
+        if (!Settings.canDrawOverlays(this)) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            this.startActivity(intent);
+        }
+    }
+
+    @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+//        Log.d(TAG, "Event Received: " + event.toString());
     }
 
     @Override
@@ -86,10 +106,13 @@ public class MouseAccessibilityService extends AccessibilityService {
 
         cursorView = View.inflate(getBaseContext(), R.layout.cursor, null);
         cursorLayout = new LayoutParams(
-                LayoutParams.WRAP_CONTENT,
-                LayoutParams.WRAP_CONTENT,
-                LayoutParams.TYPE_SYSTEM_ERROR,
-                LayoutParams.FLAG_DISMISS_KEYGUARD | LayoutParams.FLAG_NOT_FOCUSABLE | LayoutParams.FLAG_NOT_TOUCHABLE,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                        | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         cursorLayout.gravity = Gravity.TOP | Gravity.LEFT;
         cursorLayout.x = 200;
@@ -115,7 +138,9 @@ public class MouseAccessibilityService extends AccessibilityService {
                                     onMouseMove(new MouseEvent(event));
                                 }
                             });
-                        } catch (IOException e) {}
+                        } catch (IOException e) {
+                            Log.e(TAG, "Exception occurred: ", e);
+                        }
                     }
                 }
             }).start();
@@ -166,12 +191,6 @@ public class MouseAccessibilityService extends AccessibilityService {
                 break;
         }
         windowManager.updateViewLayout(cursorView, cursorLayout);
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        windowManager.addView(cursorView, cursorLayout);
-        return START_STICKY;
     }
 
 }
